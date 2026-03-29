@@ -51,5 +51,8 @@ async def create_trip_plan(request: TripRequest) -> TripPlan:
     try:
         raw_plan = await generate_trip_plan_json(request)
         return TripPlan(**raw_plan)
-    except Exception:
+    except Exception as e:
+        import traceback
+        print(f"[LLM ERROR] {type(e).__name__}: {e}")
+        traceback.print_exc()
         return _build_fallback_plan(request)

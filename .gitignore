@@ -1,0 +1,71 @@
+# ============================================================
+# 敏感信息 —— 绝对不能上传
+# ============================================================
+.env
+.env.local
+.env.*.local
+**/secrets.json
+**/*_secret*
+
+# ============================================================
+# Python
+# ============================================================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# 虚拟环境
+.venv/
+venv/
+env/
+ENV/
+
+# 构建产物
+build/
+dist/
+*.egg-info/
+*.egg
+
+# 测试 / 覆盖率
+.pytest_cache/
+.coverage
+htmlcov/
+
+# mypy / ruff / pyright 缓存
+.mypy_cache/
+.ruff_cache/
+.pyright/
+
+# ============================================================
+# Jupyter Notebook
+# ============================================================
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# ============================================================
+# IDE
+# ============================================================
+# VSCode
+.vscode/
+
+# PyCharm / IntelliJ（保留 .idea 目录本身但忽略本地状态文件）
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/usage.statistics.xml
+.idea/shelf/
+.idea/dictionaries/
+.idea/httpRequests/
+.idea/dataSources/
+.idea/dataSources.local.xml
+
+# Cursor
+.cursor/
+
+# ============================================================
+# 操作系统
+# ============================================================
+.DS_Store
+Thumbs.db
+desktop.ini

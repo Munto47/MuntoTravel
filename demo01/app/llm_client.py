@@ -18,10 +18,27 @@ def _build_messages(request: TripRequest) -> list[dict[str, str]]:
         {
             "role": "system",
             "content": (
-                "You are a travel planner. Return only valid JSON with keys: "
-                "city, travel_days, summary, days, packing_tips, budget_advice. "
-                "Each day must contain: day, theme, morning, afternoon, evening, meals, tips. "
-                "Keep the plan practical and concise."
+                "你是一名旅行规划师，注意只返回有效的JSON格式，不要有多于信息\n"
+                "The JSON must follow this exact structure and types:\n"
+                "{\n"
+                '  "city": "string",\n'
+                '  "travel_days": integer,\n'
+                '  "summary": "string",\n'
+                '  "days": [\n'
+                "    {\n"
+                '      "day": integer,\n'
+                '      "theme": "string",\n'
+                '      "morning": "string",\n'
+                '      "afternoon": "string",\n'
+                '      "evening": "string",\n'
+                '      "meals": ["string", "string", "string"],\n'
+                '      "tips": ["string", "string"]\n'
+                "    }\n"
+                "  ],\n"
+                '  "packing_tips": ["string", "string"],\n'
+                '  "budget_advice": "string"\n'
+                "}\n"
+                "IMPORTANT: meals and tips and packing_tips must be JSON arrays of strings, not objects or single strings.同时，所有的返回的内容使用中文"
             ),
         },
         {

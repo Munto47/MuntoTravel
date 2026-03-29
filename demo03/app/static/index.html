@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MuntoTravel Demo03</title>
+  <style>
+    :root {
+      --bg: #f4efe6;
+      --ink: #1f2937;
+      --muted: #6b7280;
+      --accent: #0f766e;
+      --accent-strong: #115e59;
+      --line: #e5dccf;
+      --agent-bg: #faf5ff;
+      --agent-border: #d8b4fe;
+      --agent-text: #6d28d9;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "PingFang SC", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top right, rgba(15,118,110,0.14), transparent 30%),
+        linear-gradient(180deg, #f9f4ec 0%, var(--bg) 100%);
+    }
+    .shell { max-width: 1100px; margin: 0 auto; padding: 32px 20px 64px; }
+
+    .hero { display: grid; gap: 10px; margin-bottom: 24px; }
+    .eyebrow {
+      display: inline-block; width: fit-content; padding: 6px 10px;
+      border-radius: 999px; background: rgba(109,40,217,0.10);
+      color: var(--agent-text); font-size: 14px; font-weight: 700;
+    }
+    h1 { margin: 0; font-size: clamp(28px, 5vw, 50px); line-height: 1.05; }
+    .subtitle { margin: 0; color: var(--muted); max-width: 720px; font-size: 17px; line-height: 1.6; }
+
+    .layout { display: grid; grid-template-columns: minmax(280px, 360px) 1fr; gap: 24px; align-items: start; }
+    .panel {
+      background: rgba(255,250,242,0.94); border: 1px solid var(--line);
+      border-radius: 24px; padding: 22px;
+      box-shadow: 0 18px 40px rgba(31,41,55,0.08); backdrop-filter: blur(12px);
+    }
+    .panel h2 { margin: 0 0 16px; font-size: 22px; }
+
+    .form-grid { display: grid; gap: 14px; }
+    label { display: grid; gap: 8px; font-size: 14px; font-weight: 600; }
+    input, select, textarea, button { font: inherit; }
+    input, select, textarea {
+      width: 100%; border: 1px solid #d7cbb8; border-radius: 14px;
+      padding: 12px 14px; background: #fff; color: var(--ink);
+    }
+    textarea { min-height: 90px; resize: vertical; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip {
+      border: 1px solid #c8d5d2; background: #f9fffd; color: #134e4a;
+      padding: 8px 12px; border-radius: 999px; cursor: pointer; user-select: none; transition: 0.2s;
+    }
+    .chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    button[type="submit"] {
+      border: 0; border-radius: 16px; padding: 14px 18px;
+      background: linear-gradient(135deg, var(--accent) 0%, #0f766e 65%, #164e63 100%);
+      color: #fff; font-weight: 700; cursor: pointer;
+    }
+    button[type="submit"]:disabled { opacity: 0.7; cursor: wait; }
+    .status { margin-top: 10px; font-size: 14px; color: var(--muted); }
+
+    /* Agent 推理过程 */
+    .agent-log {
+      display: none; background: var(--agent-bg); border: 1px solid var(--agent-border);
+      border-radius: 18px; padding: 16px 18px; margin-bottom: 16px;
+    }
+    .agent-log.visible { display: block; }
+    .agent-log-title {
+      font-weight: 700; color: var(--agent-text); font-size: 13px;
+      text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px;
+    }
+    .agent-steps { display: grid; gap: 6px; }
+    .agent-step {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 14px; color: #4c1d95;
+    }
+    .agent-step-icon { font-size: 16px; flex-shrink: 0; }
+
+    .result-empty { color: var(--muted); line-height: 1.7; }
+    .summary {
+      padding: 16px; border-radius: 18px;
+      background: linear-gradient(135deg, rgba(15,118,110,0.10), rgba(17,94,89,0.03));
+      border: 1px solid rgba(15,118,110,0.12); margin-bottom: 18px;
+    }
+    .days { display: grid; gap: 14px; }
+    .day-card { padding: 18px; border-radius: 18px; background: #fff; border: 1px solid var(--line); }
+    .day-card h3 { margin: 0 0 10px; font-size: 18px; }
+    .day-card p { margin: 8px 0; line-height: 1.65; }
+    .mini-title {
+      margin: 14px 0 8px; font-size: 13px; text-transform: uppercase;
+      letter-spacing: 0.08em; color: var(--accent-strong);
+    }
+    ul { margin: 8px 0 0; padding-left: 20px; line-height: 1.65; }
+    @media (max-width: 860px) { .layout { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="hero">
+      <span class="eyebrow">MuntoTravel / demo03 · Tool Use</span>
+      <h1>让 Agent 自己决定调什么工具</h1>
+      <p class="subtitle">不再由代码硬编码「先取天气」——LLM 读懂工具说明书后，自主决定调用哪些工具、调几次，再综合结果生成行程。</p>
+    </header>
+
+    <main class="layout">
+      <section class="panel">
+        <h2>创建行程</h2>
+        <form id="trip-form" class="form-grid">
+          <label>目的地城市 <input id="city" placeholder="例如：成都" required /></label>
+          <label>
+            出行天数
+            <select id="travel_days">
+              <option value="1">1 天</option>
+              <option value="2">2 天</option>
+              <option value="3" selected>3 天</option>
+              <option value="4">4 天</option>
+              <option value="5">5 天</option>
+            </select>
+          </label>
+          <label>
+            预算级别
+            <select id="budget_level">
+              <option value="low">节省型</option>
+              <option value="medium" selected>均衡型</option>
+              <option value="high">体验型</option>
+            </select>
+          </label>
+          <div>
+            <div style="font-size:14px;font-weight:600;margin-bottom:8px;">旅行偏好</div>
+            <div class="chips" id="preference-chips"></div>
+          </div>
+          <label>额外说明 <textarea id="notes" placeholder="例如：带老人出行，需要避免爬山。"></textarea></label>
+          <button type="submit" id="submit-btn">让 Agent 规划行程</button>
+          <div class="status" id="status">准备就绪。</div>
+        </form>
+      </section>
+
+      <section class="panel">
+        <h2>行程结果</h2>
+
+        <!-- Agent 推理过程（工具调用记录） -->
+        <div class="agent-log" id="agent-log">
+          <div class="agent-log-title">Agent 推理过程</div>
+          <div class="agent-steps" id="agent-steps"></div>
+        </div>
+
+        <div id="result" class="result-empty">
+          提交后，Agent 会先自主收集天气和景点数据，你可以在这里看到它的推理过程。
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const TOOL_ICONS = { "查询天气": "🌤", "查询景点": "📍" };
+    const preferenceOptions = ["城市漫游", "历史文化", "自然风景", "本地美食", "夜生活", "亲子"];
+    const selectedPreferences = new Set(["历史文化", "本地美食"]);
+    const chipRoot = document.getElementById("preference-chips");
+    const form = document.getElementById("trip-form");
+    const result = document.getElementById("result");
+    const statusEl = document.getElementById("status");
+    const submitBtn = document.getElementById("submit-btn");
+    const agentLog = document.getElementById("agent-log");
+    const agentSteps = document.getElementById("agent-steps");
+
+    function renderChips() {
+      chipRoot.innerHTML = "";
+      preferenceOptions.forEach((item) => {
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = "chip" + (selectedPreferences.has(item) ? " active" : "");
+        chip.textContent = item;
+        chip.addEventListener("click", () => {
+          selectedPreferences.has(item) ? selectedPreferences.delete(item) : selectedPreferences.add(item);
+          renderChips();
+        });
+        chipRoot.appendChild(chip);
+      });
+    }
+
+    function renderAgentLog(logs) {
+      if (!logs || logs.length === 0) { agentLog.classList.remove("visible"); return; }
+      agentSteps.innerHTML = logs.map((log) => {
+        const icon = log.startsWith("查询天气") ? "🌤" : log.startsWith("查询景点") ? "📍" : "🔧";
+        return `<div class="agent-step"><span class="agent-step-icon">${icon}</span><span>${log}</span></div>`;
+      }).join("");
+      agentLog.classList.add("visible");
+    }
+
+    function renderPlan(plan) {
+      const daysHtml = plan.days.map((day) => `
+        <article class="day-card">
+          <h3>Day ${day.day}: ${day.theme}</h3>
+          <p><strong>上午：</strong>${day.morning}</p>
+          <p><strong>下午：</strong>${day.afternoon}</p>
+          <p><strong>晚上：</strong>${day.evening}</p>
+          <div class="mini-title">餐饮建议</div>
+          <ul>${day.meals.map((m) => `<li>${m}</li>`).join("")}</ul>
+          <div class="mini-title">提醒</div>
+          <ul>${day.tips.map((t) => `<li>${t}</li>`).join("")}</ul>
+        </article>
+      `).join("");
+      result.innerHTML = `
+        <div class="summary">
+          <p><strong>${plan.city}</strong> · ${plan.travel_days} 天</p>
+          <p>${plan.summary}</p>
+          <p><strong>预算建议：</strong>${plan.budget_advice}</p>
+          <div class="mini-title">打包清单</div>
+          <ul>${plan.packing_tips.map((t) => `<li>${t}</li>`).join("")}</ul>
+        </div>
+        <div class="days">${daysHtml}</div>
+      `;
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      submitBtn.disabled = true;
+      agentLog.classList.remove("visible");
+      result.innerHTML = `<div class="result-empty">Agent 正在自主收集信息...</div>`;
+      statusEl.textContent = "Agent 运行中，通常需要 10-20 秒...";
+
+      const payload = {
+        city: document.getElementById("city").value.trim(),
+        travel_days: Number(document.getElementById("travel_days").value),
+        budget_level: document.getElementById("budget_level").value,
+        preferences: Array.from(selectedPreferences),
+        notes: document.getElementById("notes").value.trim(),
+      };
+
+      try {
+        const resp = await fetch("/api/trip/plan", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await resp.json();
+        if (!resp.ok || !data.success || !data.data) throw new Error(data.message || "生成失败");
+
+        renderAgentLog(data.agent_log);
+        renderPlan(data.data);
+        statusEl.textContent = `已完成，Agent 共调用 ${data.agent_log.length} 次工具。`;
+      } catch (err) {
+        result.innerHTML = `<div class="result-empty">生成失败：${err.message}</div>`;
+        statusEl.textContent = "请求失败，请检查后端是否启动。";
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+
+    renderChips();
+  </script>
+</body>
+</html>

@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MuntoTravel · 专属旅行画像</title>
+  <style>
+    :root {
+      --bg:      #f8f5f0;
+      --card:    #ffffff;
+      --primary: #0f766e;
+      --pdark:   #115e59;
+      --plight:  #ccfbf1;
+      --accent:  #d97706;
+      --alight:  #fef3c7;
+      --purple:  #6366f1;
+      --plite:   #ede9fe;
+      --ink:     #1f2937;
+      --muted:   #6b7280;
+      --border:  #e5dccf;
+      --shadow:  0 4px 28px rgba(31,41,55,.09);
+      --r:       20px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Segoe UI","PingFang SC","Hiragino Sans GB",sans-serif;
+      background: var(--bg); color: var(--ink); min-height: 100vh;
+    }
+
+    /* ── Progress bar (always visible, top-fixed) ── */
+    #prog-bar {
+      position: fixed; top: 0; left: 0; right: 0; height: 4px;
+      background: rgba(0,0,0,.07); z-index: 999;
+    }
+    #prog-fill {
+      height: 100%; width: 0%;
+      background: linear-gradient(90deg, var(--purple), var(--primary));
+      border-radius: 0 2px 2px 0;
+      transition: width .45s cubic-bezier(.4,0,.2,1);
+    }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed; top: 50%; left: 50%;
+      transform: translate(-50%,-50%) scale(.85);
+      background: var(--primary); color: #fff;
+      padding: 13px 28px; border-radius: 999px;
+      font-size: 16px; font-weight: 700;
+      box-shadow: 0 8px 32px rgba(15,118,110,.45);
+      z-index: 1000; pointer-events: none;
+      opacity: 0; transition: all .28s cubic-bezier(.34,1.56,.64,1);
+      white-space: nowrap;
+    }
+    #toast.show { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+
+    /* ── Confetti ── */
+    .c-dot {
+      position: fixed; border-radius: 50%; pointer-events: none; z-index: 998;
+      animation: cffall 2s ease-out forwards;
+    }
+    @keyframes cffall {
+      0%   { transform: translateY(-10px) rotate(0deg);   opacity: 1; }
+      100% { transform: translateY(65vh)  rotate(400deg); opacity: 0; }
+    }
+
+    /* ── Stage system ── */
+    .stage { display: none; }
+    .stage.active { display: flex; flex-direction: column; }
+
+    /* ── Shell ── */
+    .shell {
+      max-width: 620px; margin: 0 auto;
+      padding: 72px 20px 64px;
+      min-height: 100vh;
+      display: flex; flex-direction: column; justify-content: center;
+    }
+
+    /* ════════════════ INTRO ════════════════ */
+    .intro-eyebrow {
+      display: inline-block; padding: 5px 14px; border-radius: 999px;
+      background: var(--plite); color: var(--purple);
+      font-size: 13px; font-weight: 700; letter-spacing: .05em;
+      margin-bottom: 18px;
+    }
+    .intro-title {
+      font-size: clamp(30px,7vw,46px); font-weight: 900;
+      line-height: 1.08; margin-bottom: 14px;
+    }
+    .intro-title em { font-style: normal; color: var(--primary); }
+    .intro-sub {
+      color: var(--muted); font-size: 16px; line-height: 1.65;
+      max-width: 480px; margin-bottom: 30px;
+    }
+    .intro-stats {
+      display: flex; gap: 28px; margin-bottom: 34px;
+    }
+    .stat-num { font-size: 30px; font-weight: 900; color: var(--primary); line-height: 1; }
+    .stat-lbl { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+    /* Budget picker */
+    .budget-label { font-size: 15px; font-weight: 700; margin-bottom: 12px; }
+    .budget-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 26px; }
+    .budget-card {
+      border: 2px solid var(--border); border-radius: var(--r);
+      padding: 16px 10px; background: var(--card);
+      cursor: pointer; text-align: center;
+      display: flex; flex-direction: column; align-items: center; gap: 5px;
+      transition: all .2s;
+    }
+    .budget-card:hover { border-color: var(--primary); background: var(--plight); }
+    .budget-card.sel  { border-color: var(--primary); background: var(--plight);
+      box-shadow: 0 0 0 3px rgba(15,118,110,.18); }
+    .b-icon { font-size: 26px; }
+    .b-name { font-weight: 800; font-size: 15px; }
+    .b-desc { font-size: 12px; color: var(--muted); line-height: 1.35; }
+
+    .start-btn {
+      width: 100%; padding: 16px; border: none; border-radius: var(--r);
+      background: linear-gradient(135deg, var(--primary), var(--pdark));
+      color: #fff; font-size: 17px; font-weight: 800;
+      cursor: pointer; transition: all .2s; font-family: inherit;
+    }
+    .start-btn:disabled { opacity: .38; cursor: not-allowed; }
+    .start-btn:not(:disabled):hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(15,118,110,.3); }
+
+    /* ════════════════ QUESTION ════════════════ */
+    .q-meta {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 22px;
+    }
+    .dim-tag {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 13px; border-radius: 999px;
+      background: var(--alight); color: var(--accent);
+      font-size: 13px; font-weight: 700;
+    }
+    .q-info { text-align: right; }
+    .q-num  { font-size: 13px; color: var(--muted); }
+    .q-left { font-size: 12px; color: var(--primary); font-weight: 700; margin-top: 2px; }
+
+    /* Card with slide animation */
+    #q-wrap {
+      transition: transform .22s ease, opacity .22s ease;
+      will-change: transform, opacity;
+    }
+    .q-card {
+      background: var(--card); border-radius: var(--r); border: 1px solid var(--border);
+      padding: 26px 22px; box-shadow: var(--shadow); margin-bottom: 14px;
+    }
+    .q-text { font-size: 18px; font-weight: 700; line-height: 1.55; margin-bottom: 22px; }
+    .budget-note {
+      display: inline-block; padding: 4px 10px; border-radius: 8px;
+      background: var(--alight); color: var(--accent);
+      font-size: 12px; margin-bottom: 14px;
+    }
+    .opts { display: flex; flex-direction: column; gap: 9px; }
+    .opt-btn {
+      width: 100%; text-align: left; padding: 13px 15px;
+      border: 1.5px solid var(--border); border-radius: 14px;
+      background: #fff; cursor: pointer;
+      display: flex; align-items: flex-start; gap: 11px;
+      transition: all .18s; font-family: inherit; font-size: 14px; color: var(--ink);
+    }
+    .opt-btn:hover:not(.sel) { background: #f0fdf8; border-color: var(--primary); }
+    .opt-btn.sel {
+      background: var(--primary); border-color: var(--primary); color: #fff;
+    }
+    .opt-letter {
+      width: 26px; height: 26px; border-radius: 8px;
+      background: rgba(0,0,0,.07); flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 12px; margin-top: 1px;
+      transition: background .18s;
+    }
+    .opt-btn.sel .opt-letter { background: rgba(255,255,255,.25); color: #fff; }
+    .opt-text { flex: 1; line-height: 1.45; }
+
+    .back-btn {
+      background: none; border: none; color: var(--muted);
+      font-size: 14px; cursor: pointer; padding: 8px 0;
+      font-family: inherit; display: inline-flex; align-items: center; gap: 4px;
+    }
+    .back-btn:hover { color: var(--ink); }
+    .back-btn[hidden] { visibility: hidden; pointer-events: none; }
+
+    /* ════════════════ REVEAL ════════════════ */
+    .reveal-head { text-align: center; margin-bottom: 32px; }
+    .reveal-emoji { font-size: 52px; display: block; margin-bottom: 12px; }
+    .reveal-title { font-size: 28px; font-weight: 900; margin-bottom: 10px; }
+    .reveal-pill {
+      display: inline-block; padding: 7px 18px; border-radius: 999px;
+      background: linear-gradient(135deg, var(--plite), var(--plight));
+      font-size: 16px; font-weight: 800; color: var(--pdark); margin-bottom: 12px;
+    }
+    .reveal-desc { color: var(--muted); font-size: 15px; line-height: 1.65; max-width: 480px; }
+
+    .dim-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; margin-bottom: 30px; }
+    .dim-card {
+      background: var(--card); border: 1px solid var(--border); border-radius: var(--r);
+      padding: 15px; opacity: 0; transform: translateY(18px);
+      transition: opacity .4s, transform .4s;
+    }
+    .dim-card.vis { opacity: 1; transform: translateY(0); }
+    .dim-hd { display: flex; align-items: center; gap: 7px; margin-bottom: 9px; }
+    .dim-ico { font-size: 19px; }
+    .dim-name { font-weight: 700; font-size: 13px; flex: 1; }
+    .dim-badge {
+      padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700;
+      background: var(--plight); color: var(--pdark);
+    }
+    .score-bar { height: 5px; background: #e5e7eb; border-radius: 99px; overflow: hidden; margin-bottom: 8px; }
+    .score-fill {
+      height: 100%; width: 0%;
+      background: linear-gradient(90deg, var(--purple), var(--primary));
+      border-radius: 99px; transition: width .9s cubic-bezier(.4,0,.2,1);
+    }
+    .dim-desc-txt { font-size: 12px; color: var(--muted); line-height: 1.4; }
+
+    .proceed-btn {
+      width: 100%; padding: 16px; border: none; border-radius: var(--r);
+      background: linear-gradient(135deg, var(--purple) 0%, var(--primary) 100%);
+      color: #fff; font-size: 17px; font-weight: 800;
+      cursor: pointer; font-family: inherit; transition: transform .2s;
+    }
+    .proceed-btn:hover { transform: translateY(-2px); }
+
+    /* ════════════════ PLANNING ════════════════ */
+    .plan-head { text-align: center; margin-bottom: 26px; }
+    .plan-head h2 { font-size: 26px; font-weight: 900; margin-bottom: 8px; }
+    .profile-pill {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 7px 16px; border-radius: 999px;
+      background: var(--plight); color: var(--pdark);
+      font-size: 14px; font-weight: 700; margin-bottom: 8px;
+    }
+    .plan-sub { color: var(--muted); font-size: 14px; }
+    .plan-card {
+      background: var(--card); border-radius: var(--r); border: 1px solid var(--border);
+      padding: 24px; box-shadow: var(--shadow);
+    }
+    .fgroup { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+    .flabel { font-size: 14px; font-weight: 700; }
+    .finput {
+      padding: 12px 14px; border: 1.5px solid var(--border); border-radius: 14px;
+      font-size: 15px; font-family: inherit; color: var(--ink); background: #fff; width: 100%;
+      transition: border-color .2s;
+    }
+    .finput:focus { outline: none; border-color: var(--primary); }
+    .ftarea { resize: vertical; min-height: 80px; }
+    .plan-btn {
+      width: 100%; padding: 16px; border: none; border-radius: var(--r);
+      background: linear-gradient(135deg, var(--primary), var(--pdark));
+      color: #fff; font-size: 17px; font-weight: 800;
+      cursor: pointer; font-family: inherit; margin-top: 6px; transition: opacity .2s;
+    }
+    .plan-btn:disabled { opacity: .55; cursor: wait; }
+    .plan-status { font-size: 14px; color: var(--muted); text-align: center; margin-top: 10px; min-height: 20px; }
+
+    /* ════════════════ RESULT ════════════════ */
+    .result-top {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 22px;
+    }
+    .result-top h2 { font-size: 22px; font-weight: 900; }
+    .restart-btn {
+      font: inherit; font-size: 13px; color: var(--muted);
+      background: none; border: none; cursor: pointer;
+    }
+    .agent-log-box {
+      background: var(--plite); border: 1px solid #c4b5fd;
+      border-radius: var(--r); padding: 15px 18px; margin-bottom: 18px;
+    }
+    .log-title {
+      font-size: 12px; font-weight: 700; color: var(--purple);
+      text-transform: uppercase; letter-spacing: .07em; margin-bottom: 8px;
+    }
+    .log-step { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #4c1d95; margin-bottom: 5px; }
+    .r-summary {
+      background: linear-gradient(135deg, var(--plight), rgba(255,255,255,0));
+      border: 1px solid rgba(15,118,110,.14); border-radius: var(--r);
+      padding: 18px; margin-bottom: 14px;
+    }
+    .r-summary h3 { font-size: 19px; margin-bottom: 8px; }
+    .r-summary p  { color: var(--muted); font-size: 14px; line-height: 1.65; margin-bottom: 6px; }
+    .day-cards { display: grid; gap: 12px; }
+    .day-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 18px;
+    }
+    .day-card h3 { font-size: 16px; font-weight: 800; margin-bottom: 10px; }
+    .day-card p  { font-size: 14px; line-height: 1.65; margin-bottom: 7px; }
+    .mini-ttl {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .08em; color: var(--primary); margin: 10px 0 5px;
+    }
+    ul { padding-left: 18px; }
+    ul li { font-size: 14px; line-height: 1.65; margin-bottom: 3px; }
+
+    /* 画像应用横幅 */
+    .pa-banner {
+      background: linear-gradient(135deg, #f0fdf4, #ecfdf5);
+      border: 1px solid #86efac; border-radius: var(--r);
+      padding: 16px 18px; margin-bottom: 16px;
+    }
+    .pa-title {
+      font-size: 13px; font-weight: 800; color: #14532d;
+      display: flex; align-items: center; gap: 6px; margin-bottom: 10px;
+    }
+    .pa-list { display: flex; flex-direction: column; gap: 5px; }
+    .pa-item {
+      display: flex; align-items: flex-start; gap: 7px; font-size: 13px; color: #166534;
+    }
+    .pa-dot {
+      width: 6px; height: 6px; border-radius: 50%; background: #22c55e;
+      flex-shrink: 0; margin-top: 5px;
+    }
+
+    /* 每日画像理由 */
+    .pnote {
+      display: flex; align-items: flex-start; gap: 8px;
+      background: var(--plite); border-radius: 12px;
+      padding: 10px 12px; margin-top: 12px;
+      border-left: 3px solid var(--purple);
+    }
+    .pnote-icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+    .pnote-text { font-size: 13px; color: #4c1d95; line-height: 1.5; font-style: italic; }
+
+    @media (max-width: 480px) {
+      .budget-grid { grid-template-columns: 1fr; }
+      .dim-grid    { grid-template-columns: 1fr; }
+      .q-text      { font-size: 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Progress bar -->
+<div id="prog-bar"><div id="prog-fill"></div></div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- ════ INTRO ════ -->
+<div id="s-intro" class="stage active">
+  <div class="shell">
+    <div class="intro-eyebrow">MuntoTravel · demo05 · 偏好问卷</div>
+    <h1 class="intro-title">告诉我你是<br><em>什么样的旅行者</em></h1>
+    <p class="intro-sub">回答 16 道真实情境题，约需 3 分钟。<br>AI 将基于你的旅行性格，生成一份真正属于你的专属行程。</p>
+
+    <div class="intro-stats">
+      <div><div class="stat-num">16</div><div class="stat-lbl">道情境题</div></div>
+      <div><div class="stat-num">8</div><div class="stat-lbl">个维度分析</div></div>
+      <div><div class="stat-num">3'</div><div class="stat-lbl">即可完成</div></div>
+    </div>
+
+    <p class="budget-label">首先，选择你这次旅行的预算档位：</p>
+    <div class="budget-grid">
+      <button class="budget-card" id="b-low"    onclick="pickBudget('low')">
+        <span class="b-icon">💰</span>
+        <span class="b-name">节省型</span>
+        <span class="b-desc">性价比优先，把钱花在刀刃上</span>
+      </button>
+      <button class="budget-card" id="b-medium" onclick="pickBudget('medium')">
+        <span class="b-icon">⚖️</span>
+        <span class="b-name">均衡型</span>
+        <span class="b-desc">品质与价格兼顾，舒适出行</span>
+      </button>
+      <button class="budget-card" id="b-high"   onclick="pickBudget('high')">
+        <span class="b-icon">✨</span>
+        <span class="b-name">体验型</span>
+        <span class="b-desc">不将就，让旅行成为美好记忆</span>
+      </button>
+    </div>
+
+    <button class="start-btn" id="start-btn" onclick="startQ()" disabled>开始答题 →</button>
+  </div>
+</div>
+
+<!-- ════ QUESTION ════ -->
+<div id="s-question" class="stage">
+  <div class="shell" style="justify-content:flex-start; padding-top:80px;">
+    <div class="q-meta">
+      <span class="dim-tag" id="q-dim"></span>
+      <div class="q-info">
+        <div class="q-num"  id="q-num"></div>
+        <div class="q-left" id="q-left"></div>
+      </div>
+    </div>
+
+    <div id="q-wrap">
+      <div class="q-card">
+        <p class="q-text" id="q-text"></p>
+        <div id="q-budget-note"></div>
+        <div class="opts" id="q-opts"></div>
+      </div>
+    </div>
+
+    <button class="back-btn" id="back-btn" onclick="goBack()">← 上一题</button>
+  </div>
+</div>
+
+<!-- ════ REVEAL ════ -->
+<div id="s-reveal" class="stage">
+  <div class="shell">
+    <div class="reveal-head">
+      <span class="reveal-emoji">🎉</span>
+      <h2 class="reveal-title">你的旅行画像出来了！</h2>
+      <div class="reveal-pill" id="rv-label"></div>
+      <p class="reveal-desc" id="rv-desc"></p>
+    </div>
+    <div class="dim-grid" id="dim-grid"></div>
+    <button class="proceed-btn" onclick="goPlanning()">基于这份画像，帮我规划行程 →</button>
+  </div>
+</div>
+
+<!-- ════ PLANNING ════ -->
+<div id="s-plan" class="stage">
+  <div class="shell">
+    <div class="plan-head">
+      <h2>填写目的地</h2>
+      <div class="profile-pill" id="plan-pill"></div>
+      <p class="plan-sub">AI 已了解你的旅行风格，接下来告诉我去哪儿就好</p>
+    </div>
+    <div class="plan-card">
+      <div class="fgroup">
+        <label class="flabel">目的地城市</label>
+        <input class="finput" id="f-city" placeholder="例如：成都、杭州、西安" />
+      </div>
+      <div class="fgroup">
+        <label class="flabel">出行天数</label>
+        <select class="finput" id="f-days">
+          <option value="2">2 天</option>
+          <option value="3" selected>3 天</option>
+          <option value="4">4 天</option>
+          <option value="5">5 天</option>
+        </select>
+      </div>
+      <div class="fgroup">
+        <label class="flabel">额外说明（可选）</label>
+        <textarea class="finput ftarea" id="f-notes" placeholder="例如：带孩子出行，需要避免太累的路线"></textarea>
+      </div>
+      <button class="plan-btn" id="plan-btn" onclick="submitPlan()">让 AI 为我定制行程</button>
+      <p class="plan-status" id="plan-status"></p>
+    </div>
+  </div>
+</div>
+
+<!-- ════ RESULT ════ -->
+<div id="s-result" class="stage">
+  <div class="shell" style="justify-content:flex-start; padding-top:80px;">
+    <div class="result-top">
+      <h2>你的专属行程</h2>
+      <button class="restart-btn" onclick="restart()">重新开始</button>
+    </div>
+    <div id="result-content"></div>
+  </div>
+</div>
+
+<script>
+/* ──────────────────── 题库数据 ──────────────────── */
+const QS = [
+  { dim:"pace",  name:"行程节奏", icon:"🏃",
+    text:"你们今天排了 5 个景点，到第 3 个的时候你觉得这里特别好，想多待一会儿，你会：",
+    opts:["就在这里多玩半天，剩下的不去也行","多留半小时，然后后面加快节奏","按计划走，虽然舍不得","不存在这个问题——出发前就研究好了每个地方值几分，不会超时"] },
+
+  { dim:"pace",  name:"行程节奏", icon:"🏃",
+    text:"今天行程结束，距离天黑还有 2 小时，同行的人提议临时加一个附近的景点，你会：",
+    opts:["算了，回酒店休息，放松也是旅行的一部分","离得近就去，远的话就算了","去！多看一个是一个","我早就查好附近有什么了，知道这个时间段去哪里最值"] },
+
+  { dim:"food",  name:"美食探索", icon:"🍜",
+    text:"朋友说某家苍蝇馆子排队 2 小时，但据说是当地最地道的味道，你会：",
+    opts:["完全不值得，随便找家干净的吃就行","排半小时可以，超过就算了","值得！排队也是旅行体验的一部分","出发前我就已经把它列为行程必打卡了"] },
+
+  { dim:"food",  name:"美食探索", icon:"🍜",
+    text:"你们走到一条小吃街，有 10 家摊位，但你已经半饱了，你会：",
+    opts:["找个地方坐着等大家，不饿就不吃","扫一眼，找一两样特别想试的","挨个逛过去，每家都要尝一口","早就研究好了哪几家最值得，直奔那几家"] },
+
+  { dim:"culture", name:"文化兴趣", icon:"🏛",
+    text:"景区里有个专题展览，需要额外花 40 分钟认真参观，但免费，你会：",
+    opts:["不去，旅行不需要这么费脑子","进去快速扫一圈，走马观花","认真看，这是了解当地最好的方式","我这次来就是为了这个展，提前预约了"] },
+
+  { dim:"culture", name:"文化兴趣", icon:"🏛",
+    text:"你路过一块刻着文字的古碑，旁边有二维码可以扫听历史讲解，你会：",
+    opts:["完全不感兴趣，拍个照继续走","扫了一半觉得太长，关掉走人","认真听完，挺有意思的","不用扫，来之前我就已经查过这块碑的背景了"] },
+
+  { dim:"nature", name:"自然亲近", icon:"🏔",
+    text:"旅行中遇到需要爬山或步行超过 2 小时的行程，你的反应是：",
+    opts:["直接放弃，坐缆车或打车解决","如果是平路可以接受，爬坡就算了","没问题，这本来就是旅行的一部分","期待！越有挑战性越兴奋"] },
+
+  { dim:"nature", name:"自然亲近", icon:"🏔",
+    text:"你们在山顶，下山有缆车和徒步两条路，徒步要 1 小时，你会：",
+    opts:["当然坐缆车，下山有什么好走的","看天气，天气好才考虑走","走下去，景色不一样，值得","必走，这一小时才是今天最精彩的部分"] },
+
+  { dim:"photo", name:"拍照打卡", icon:"📸",
+    text:"当你发现前面不远有一个「出片」的地方，但人非常多，你会：",
+    opts:["我不爱拍照，直接跳过","站旁边随便拍拍就好","等人少了再去，值得等","挤进去，必须要有这张照片"] },
+
+  { dim:"photo", name:"拍照打卡", icon:"📸",
+    text:"有一个公认绝美的日出观景台，但需要早上 4 点起床，你会：",
+    opts:["算了，日出有什么好看的，睡觉要紧","有人愿意陪就去，一个人不去","去！这种日出照一辈子难得几张","昨晚就设好了闹钟，还查好了最佳拍摄机位"] },
+
+  { dim:"activity", name:"体力偏好", icon:"⚡",
+    text:"行程里安排了一段 5 公里的骑行，你的反应是：",
+    opts:["可以换成其他方式吗，骑行太累了","5 公里还好，再长就算了","没问题，骑完还感觉不过瘾","5 公里太短了，问问有没有更长的路线"] },
+
+  { dim:"activity", name:"体力偏好", icon:"⚡",
+    text:"有一段没有台阶的山路需要手脚并用爬行约 20 分钟，你会：",
+    opts:["直接放弃，这不是我来旅行的方式","试一试，爬不动再说","爬！这才是真正的野趣","我专门备了手套和登山杖，就等这个"] },
+
+  { dim:"accommodation", name:"住宿品质", icon:"🛏", budgetNote:true,
+    text:"当你需要入住一个有独卫独浴但空间很小的酒店时，你会：",
+    opts:["完全可以，我平常住的是青旅","可以接受，这就是我会选的","不行，我需要连锁品牌，有品质保障","不够，住的地方必须要有档次"] },
+
+  { dim:"accommodation", name:"住宿品质", icon:"🛏", budgetNote:true,
+    text:"在你这次旅行的预算范围内，如果住宿升级要多花一些钱，你会：",
+    opts:["不升，省下来的钱花在吃喝玩上更值","看具体是什么级别的升级再决定","升，睡好了才有精力白天玩","当然升，住的好本身就是旅行体验的一部分"] },
+
+  { dim:"social", name:"社交性格", icon:"💬",
+    text:"你在景点排队，旁边的陌生人主动跟你搭话，说他们是本地人，你会：",
+    opts:["礼貌回应，但不想深聊，低头看手机","聊几句，如果有趣就继续","聊起来！本地人最懂哪里好玩","主动追问有没有不在攻略上的私藏地方"] },
+
+  { dim:"social", name:"社交性格", icon:"💬",
+    text:"旅行结束，回到酒店你最想做的第一件事是：",
+    opts:["一个人安静放空，或者直接睡觉","跟同行的人聊聊今天的见闻","发朋友圈，跟家人朋友分享今天","写旅行日记或做个视频，留下来分享给更多人"] },
+];
+
+const BUDGET_LABELS = { low:"节省型", medium:"均衡型", high:"体验型" };
+
+/* ──────────────────── 状态 ──────────────────── */
+let budget    = null;
+let curIdx    = 0;
+let answers   = new Array(16).fill(null);
+let profile   = null;
+let animating = false;
+
+/* ──────────────────── 工具函数 ──────────────────── */
+function show(id) {
+  document.querySelectorAll('.stage').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0, 0);
+}
+
+function setProgress(pct) {
+  document.getElementById('prog-fill').style.width = pct + '%';
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+function confetti() {
+  const colors = ['#0f766e','#d97706','#6366f1','#ec4899','#10b981','#f59e0b'];
+  for (let i = 0; i < 55; i++) {
+    const d = document.createElement('div');
+    d.className = 'c-dot';
+    d.style.cssText = `
+      left:${Math.random()*100}%;top:${-5+Math.random()*15}px;
+      background:${colors[i%colors.length]};
+      width:${5+Math.random()*8}px;height:${5+Math.random()*8}px;
+      animation-duration:${1.6+Math.random()*1.2}s;
+      animation-delay:${Math.random()*0.7}s;`;
+    document.body.appendChild(d);
+    setTimeout(() => d.remove(), 3500);
+  }
+}
+
+/* ──────────────────── Intro ──────────────────── */
+function pickBudget(b) {
+  budget = b;
+  ['low','medium','high'].forEach(k =>
+    document.getElementById('b-'+k).classList.toggle('sel', k === b));
+  document.getElementById('start-btn').disabled = false;
+}
+
+function startQ() {
+  curIdx = 0;
+  show('s-question');
+  renderQ(curIdx);
+}
+
+/* ──────────────────── Question ──────────────────── */
+function renderQ(idx) {
+  const q = QS[idx];
+  const wrap = document.getElementById('q-wrap');
+  wrap.style.transform = '';
+  wrap.style.opacity   = '1';
+
+  document.getElementById('q-dim').textContent  = q.icon + ' ' + q.name;
+  document.getElementById('q-num').textContent  = `第 ${idx+1} 题 / 共 16 题`;
+  const rem = 16 - idx - 1;
+  document.getElementById('q-left').textContent = rem > 0 ? `还有 ${rem} 题` : '最后一题！';
+
+  document.getElementById('q-text').textContent = q.text;
+
+  const noteEl = document.getElementById('q-budget-note');
+  noteEl.innerHTML = q.budgetNote
+    ? `<div class="budget-note">⚠️ 以下选项基于你选择的「${BUDGET_LABELS[budget]}」预算档位</div>`
+    : '';
+
+  const LETTERS = ['A','B','C','D'];
+  document.getElementById('q-opts').innerHTML = q.opts.map((opt, i) => `
+    <button class="opt-btn ${answers[idx]===i+1?'sel':''}" onclick="pickAnswer(${i+1})">
+      <span class="opt-letter">${LETTERS[i]}</span>
+      <span class="opt-text">${opt}</span>
+    </button>`).join('');
+
+  // back button visibility
+  document.getElementById('back-btn').toggleAttribute('hidden', idx === 0);
+
+  // progress: starts at ~6% for Q1, fills to 100% at Q16
+  setProgress(Math.max(6, (idx / 16) * 100));
+}
+
+function pickAnswer(score) {
+  if (animating) return;
+  answers[curIdx] = score;
+
+  // highlight
+  document.querySelectorAll('.opt-btn').forEach((b, i) => {
+    b.classList.toggle('sel', i + 1 === score);
+  });
+
+  // milestone toasts
+  if (curIdx === 7)  setTimeout(() => toast('已完成一半！继续加油 🎉'), 180);
+  if (curIdx === 11) setTimeout(() => toast('快完成了！再答 4 题 💪'), 180);
+
+  animating = true;
+  setTimeout(() => {
+    if (curIdx < 15) {
+      slideOut('left', () => { curIdx++; renderQ(curIdx); slideIn('right'); });
+    } else {
+      finishQ();
+    }
+  }, 340);
+}
+
+function goBack() {
+  if (curIdx === 0 || animating) return;
+  slideOut('right', () => { curIdx--; renderQ(curIdx); slideIn('left'); });
+}
+
+function slideOut(dir, cb) {
+  animating = true;
+  const wrap = document.getElementById('q-wrap');
+  wrap.style.transition = 'transform .2s ease, opacity .2s ease';
+  wrap.style.transform  = dir === 'left' ? 'translateX(-45px)' : 'translateX(45px)';
+  wrap.style.opacity    = '0';
+  setTimeout(cb, 210);
+}
+
+function slideIn(from) {
+  const wrap = document.getElementById('q-wrap');
+  wrap.style.transition = 'none';
+  wrap.style.transform  = from === 'right' ? 'translateX(45px)' : 'translateX(-45px)';
+  wrap.style.opacity    = '0';
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    wrap.style.transition = 'transform .25s ease, opacity .25s ease';
+    wrap.style.transform  = 'translateX(0)';
+    wrap.style.opacity    = '1';
+    setTimeout(() => { animating = false; }, 260);
+  }));
+}
+
+/* ──────────────────── 完成 & 画像揭晓 ──────────────────── */
+async function finishQ() {
+  setProgress(100);
+  const payload = { budget_level: budget };
+  answers.forEach((a, i) => { payload[`q${i+1}`] = a; });
+
+  try {
+    const res  = await fetch('/api/questionnaire/analyze', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    profile = data.user_profile;
+    showReveal(profile);
+  } catch (e) {
+    toast('画像生成失败，请刷新重试');
+    animating = false;
+  }
+}
+
+function showReveal(p) {
+  show('s-reveal');
+  confetti();
+
+  document.getElementById('rv-label').textContent = p.personality_label;
+  document.getElementById('rv-desc').textContent  = p.personality_desc;
+
+  const grid = document.getElementById('dim-grid');
+  grid.innerHTML = '';
+  p.dimensions.forEach((dim, i) => {
+    const pct = Math.round((dim.score / 8) * 100);
+    const card = document.createElement('div');
+    card.className = 'dim-card';
+    card.innerHTML = `
+      <div class="dim-hd">
+        <span class="dim-ico">${dim.icon}</span>
+        <span class="dim-name">${dim.name}</span>
+        <span class="dim-badge">${dim.label}</span>
+      </div>
+      <div class="score-bar"><div class="score-fill" id="sf-${dim.key}"></div></div>
+      <p class="dim-desc-txt">${dim.description}</p>`;
+    grid.appendChild(card);
+
+    // stagger: appear then animate bar
+    setTimeout(() => {
+      card.classList.add('vis');
+      setTimeout(() => {
+        const sf = document.getElementById('sf-' + dim.key);
+        if (sf) sf.style.width = pct + '%';
+      }, 220);
+    }, i * 95);
+  });
+}
+
+/* ──────────────────── 规划 ──────────────────── */
+function goPlanning() {
+  show('s-plan');
+  const lbl = profile ? profile.personality_label : BUDGET_LABELS[budget];
+  document.getElementById('plan-pill').innerHTML = '🎯 画像：' + lbl;
+}
+
+async function submitPlan() {
+  const city  = document.getElementById('f-city').value.trim();
+  const days  = Number(document.getElementById('f-days').value);
+  const notes = document.getElementById('f-notes').value.trim();
+  if (!city) { alert('请填写目的地城市'); return; }
+
+  const btn    = document.getElementById('plan-btn');
+  const status = document.getElementById('plan-status');
+  btn.disabled = true;
+  status.textContent = 'AI 正在基于你的画像规划行程，通常需要 15-25 秒…';
+
+  const payload = {
+    answers: { budget_level: budget },
+    city, travel_days: days, notes,
+  };
+  answers.forEach((a, i) => { payload.answers[`q${i+1}`] = a; });
+
+  try {
+    const res  = await fetch('/api/trip/plan-with-profile', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!data.success || !data.data) throw new Error(data.message || '规划失败');
+    showResult(data);
+  } catch (e) {
+    status.textContent = '规划失败：' + e.message;
+    btn.disabled = false;
+  }
+}
+
+function showResult(data) {
+  show('s-result');
+  const plan = data.data;
+  const logs = data.agent_log || [];
+  let html = '';
+
+  if (logs.length) {
+    html += `<div class="agent-log-box">
+      <div class="log-title">Agent 推理过程（LangGraph · 画像驱动）</div>
+      ${logs.map(l => {
+        const ico = l.startsWith('查询天气') ? '🌤' : l.startsWith('查询景点') ? '📍' : '🔧';
+        return `<div class="log-step"><span>${ico}</span><span>${l}</span></div>`;
+      }).join('')}
+    </div>`;
+  }
+
+  // 画像应用横幅（有 profile_applications 时才显示）
+  const apps = plan.profile_applications || [];
+  if (apps.length > 0) {
+    html += `<div class="pa-banner">
+      <div class="pa-title">🎯 你的问卷结果已应用到行程中</div>
+      <div class="pa-list">${apps.map(a => {
+        const [dim, ...rest] = a.split('：');
+        const desc = rest.join('：');
+        return `<div class="pa-item">
+          <span class="pa-dot"></span>
+          <span><strong>${dim}</strong>${desc ? '：' + desc : ''}</span>
+        </div>`;
+      }).join('')}</div>
+    </div>`;
+  }
+
+  html += `<div class="r-summary">
+    <h3>${plan.city} · ${plan.travel_days} 天专属行程</h3>
+    <p>${plan.summary}</p>
+    <p><strong>预算建议：</strong>${plan.budget_advice}</p>
+    <div class="mini-ttl">打包清单</div>
+    <ul>${plan.packing_tips.map(t => `<li>${t}</li>`).join('')}</ul>
+  </div>`;
+
+  html += `<div class="day-cards">${plan.days.map(d => `
+    <div class="day-card">
+      <h3>Day ${d.day}：${d.theme}</h3>
+      <p><strong>上午：</strong>${d.morning}</p>
+      <p><strong>下午：</strong>${d.afternoon}</p>
+      <p><strong>晚上：</strong>${d.evening}</p>
+      <div class="mini-ttl">餐饮</div>
+      <ul>${d.meals.map(m=>`<li>${m}</li>`).join('')}</ul>
+      <div class="mini-ttl">贴士</div>
+      <ul>${d.tips.map(t=>`<li>${t}</li>`).join('')}</ul>
+      ${d.profile_note ? `
+      <div class="pnote">
+        <span class="pnote-icon">🎯</span>
+        <span class="pnote-text">${d.profile_note}</span>
+      </div>` : ''}
+    </div>`).join('')}</div>`;
+
+  document.getElementById('result-content').innerHTML = html;
+}
+
+/* ──────────────────── 重置 ──────────────────── */
+function restart() {
+  budget = null; curIdx = 0;
+  answers = new Array(16).fill(null); profile = null; animating = false;
+  ['low','medium','high'].forEach(k =>
+    document.getElementById('b-'+k).classList.remove('sel'));
+  document.getElementById('start-btn').disabled = true;
+  document.getElementById('f-city').value = '';
+  document.getElementById('f-notes').value = '';
+  document.getElementById('plan-status').textContent = '';
+  document.getElementById('plan-btn').disabled = false;
+  setProgress(0);
+  show('s-intro');
+}
+</script>
+</body>
+</html>

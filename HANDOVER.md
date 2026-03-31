@@ -1,342 +1,187 @@
 # MuntoTravel 项目交接文件
 
-> 版本：2026-03-30  
-> 上一位开发者：Cursor AI Assistant  
-> 当前进度：demo09 已完成并通过验证
+> 版本：2026-03-31  
+> 维护者：项目团队 / Cursor AI Assistant  
+> 当前主线：**demo11 已完成**（地图可视化）  
+> 对话背景参考（Cursor agent-transcripts）：`f3774bdf-e0f1-4b89-a018-2c1a7b43cda7`（学习路线、demo00–08、问卷与多 Agent 等）、`383be103-6619-4bb4-9fab-0e8a33647cfc`（迭代方案、高德优化、demo10 修复与 demo11 启动）。
 
 ---
 
-## 一、项目概述
+## 一、项目目标（总览）
 
-MuntoTravel 是一个渐进式学习项目，目标是从零开始构建一个生产级智能旅行规划 Agent。
-每个 demo 都引入一个新的技术概念，形成完整的学习路线。
+### 1.1 学习目标（产品形态）
 
-**目标用户**：国内旅行用户，主要面向中文市场。
+从零到一构建一个**面向国内中文用户**的智能旅行规划应用，同时作为**渐进式学习模板**：技术路线为「直接 LLM → FastAPI → 工具调用 → LangGraph → Multi-Agent → 生产化」。每个 `demo` 引入一个可讲清楚的概念，便于后来者按目录学习。
 
-**技术路线**：`直接 LLM 调用 → FastAPI → 工具调用 → LangGraph → Multi-Agent → 生产化`
+### 1.2 产品愿景（中长期，分阶段落地）
 
----
+依据项目讨论中形成的**完整愿景**（不必一次实现），包括但不限于：
 
-## 二、项目结构
+1. **城际交通**：出发地/目的地、多种方式（自驾、火车/高铁等），结合地图或列车信息生成往返方案；困难时用本地数据保底。  
+2. **问卷与画像**：「多份答案 → 一份规划」；问卷需易答、有场景题；画像结果**显式**体现在行程或说明中（用户感到「没白答」）。  
+3. **端到端路线**：从 A 到 B 的城际方案 + 目的地城内景点/餐厅/酒店之间的**可执行路线**（非空话）。  
+4. **地图与参与感**：规划完成后在地图上**动态演示**行程（可含逐站强调、未来可扩展配图等）。  
+5. **数据质量**：POI/榜单/实时性（如扫街榜、多源筛选）在能力范围内逐步接入；备注（如带老人、素食）需被各专员消费。  
+6. **价格与档位**：接入价格或规则后，按消费等级组合美食/出行/住宿方案。
 
-```
-MuntoTravel/
-├── .gitignore          # API Key 防泄漏配置
-├── HANDOVER.md         # 本文件
-├── demo00/             # Jupyter：直接调用 LLM API
-├── demo01/             # FastAPI + 基础规划
-├── demo02/             # 天气工具（上下文注入）
-├── demo03/             # QWeather + 高德 POI
-├── demo04/             # LangGraph 基础 Agent（工具调用循环）
-├── demo05/             # 问卷系统 + 用户画像（已暂停）
-├── demo06/             # 城际交通规划（基础版）
-├── demo07/             # 精细交通 + 日志系统
-├── demo08/             # Multi-Agent 并行图（Fan-out/Fan-in）
-└── demo09/             # 两阶段图 + 城市内路线规划（当前最新）
-```
-
-每个 demo 都是独立的 FastAPI 应用，有自己的 `.env`、`requirements.txt`、`README.md`。
+当前代码已覆盖其中 **3、4 的部分能力**（城内路线 + 坐标 + 前端地图动画），其余见「未完成事项」与路线图。
 
 ---
 
-## 三、各 demo 状态速览
+## 二、预期实现功能与预期效果
 
-| demo | 核心功能 | 状态 | 端口 | 关键文件 |
-|------|---------|------|------|---------|
-| demo00 | Jupyter 直接 LLM | ✅ 完成 | — | PlanWithLLM.ipynb |
-| demo01 | FastAPI 基础规划 | ✅ 完成 | 8001 | app/main.py |
-| demo02 | 天气上下文注入 | ✅ 完成 | 8002 | app/weather_client.py |
-| demo03 | QWeather + 高德 POI | ✅ 完成 | 8003 | app/weather_client.py, tools.py |
-| demo04 | LangGraph Agent | ✅ 完成 | 8004 | app/graph.py |
-| demo05 | 问卷系统 | ⚠️ 暂停 | 8005 | app/profiler.py, schemas.py |
-| demo06 | 城际交通基础版 | ✅ 完成 | 8006 | app/transport_client.py |
-| demo07 | 精细交通 + 日志 | ✅ 完成 | 8007 | app/logger.py, transport_client.py |
-| demo08 | Multi-Agent 并行 | ✅ 完成 | 8008 | app/graph.py, agents.py |
-| demo09 | 两阶段图 + 路线 | ✅ 完成 | 8009 | app/graph.py, route_client.py |
+### 2.1 已具备的用户可见效果（主线 demo10 / demo11）
 
----
+| 能力 | 预期效果 |
+|------|----------|
+| 表单输入 | 目的地、可选出发地/住宿、天数、偏好、预算、备注；阳光系 UI。 |
+| 多 Agent 并行 | 天气、POI、（可选）城际交通并行采集，时间线展示各 Agent 状态。 |
+| 两阶段规划 | Planner（LLM）生成结构化行程；Route（无 LLM）用高德 API 计算相邻点路线段。 |
+| 问卷（可选） | `GET /api/questionnaire` + `POST /api/profile` 生成 `profile_note`，注入规划（用户可不填问卷仅用兴趣）。 |
+| 富 POI / 交通卡片 | 结构化展示候选 POI、驾车/列车参考等（策略随版本在 `transport_client` / `agents` 中定义）。 |
+| **地图（demo11）** | 响应中带 `coord_map`；前端加载高德 JSAPI 2.0，按日 Polyline、地点 Marker，支持「动画播放」逐站高亮。 |
 
-## 四、技术栈全览
+### 2.2 配置到位时的预期
 
-### 后端
-- **Python 3.11+**
-- **FastAPI** — Web 框架
-- **Pydantic v2** — 数据验证与序列化
-- **LangGraph** — Multi-Agent 图编排（核心）
-- **LangChain-OpenAI** — LLM 调用适配
-- **httpx** — 异步 HTTP 客户端
-- **python-dotenv** — 环境变量管理
-- **uvicorn** — ASGI 服务器
+- **`OPENAI_API_KEY`**：行程 JSON 可生成并通过 Pydantic 校验。  
+- **`AMAP_API_KEY`（Web 服务）**：POI、geocode、城内步行/骑行/公交路线可用；坐标进入缓存，`coord_map` 有内容。  
+- **`AMAP_JS_KEY`（Web 端 JS API）**：浏览器内**交互地图**可用；未配置时仍有文字行程与静态示意（若有），地图区显示配置说明而非崩溃。
 
-### 前端
-- 纯 HTML + CSS + Vanilla JS（无框架）
-- 阳光/活力色系（橙 + 天蓝渐变主题）
+### 2.3 与「完整愿景」的差距（诚实预期）
 
-### 外部 API
-| API | 用途 | Key 变量 | 免费限制 |
-|-----|------|---------|---------|
-| OpenAI | LLM 生成 | `OPENAI_API_KEY` | 按 token 计费 |
-| 高德地图 | POI/路线/geocode | `AMAP_API_KEY` | 每日 5000 次免费 |
-| 和风天气 | 天气预报 | `QWEATHER_API_KEY` | 每日 1000 次免费 |
-| Open-Meteo | 天气备源 | 无需 Key | 免费 |
-
-### LangGraph 核心概念（已覆盖）
-| 概念 | 首次出现 | 代码位置 |
-|------|---------|---------|
-| StateGraph + TypedDict | demo04 | graph.py |
-| @tool + ToolNode | demo04 | tools.py |
-| agentic loop (should_continue) | demo04 | graph.py |
-| bind_tools | demo04 | graph.py |
-| Send() Fan-out | demo08 | graph.py::dispatch_agents |
-| Annotated + operator.add reducer | demo08 | graph.py::TravelState |
-| Fan-in 自动同步 | demo08 | graph.py::build_graph |
-| 顺序 add_edge | demo09 | graph.py::build_graph |
-| 状态读-改-写 | demo09 | graph.py::route_node |
+- 列车/高铁**实时时刻与票价**仍以参考或 12306 引导为主，非全量真实 API。  
+- **小红书/美团/豆瓣等榜单**未接入；POI 以高德为主，质量依赖检索词与 prompt。  
+- **问卷**已重启为 demo10 方案，与早期 16 题设想不同；个性化仍可能因 POI 固化等问题需持续优化（见已知问题）。  
+- 地图动画当前为 **Marker + 折线 + 播放**，**逐站配图**属未来扩展。
 
 ---
 
-## 五、demo09 核心架构详解（最新版）
+## 三、已完成内容（按 demo）
 
-### 图结构
-```
-START
-  │ dispatch_agents() → Send()
-  ├──→ weather_agent   ─┐  Phase 1: 并行数据采集（无 LLM，快）
-  ├──→ poi_agent        ├─ Fan-in（LangGraph 自动同步）
-  └──→ transport_agent ─┘
-                 ↓
-         planner_node   Phase 2a: LLM 决策（决定去哪里）
-                 ↓ add_edge（顺序）
-          route_node    Phase 2b: 工具执行（计算怎么走）
-                 ↓
-               END
-```
+| demo | 状态 | 端口 | 核心交付 |
+|------|------|------|----------|
+| demo00 | ✅ | — | Jupyter：直连 LLM |
+| demo01 | ✅ | 8001 | FastAPI 基础规划 |
+| demo02 | ✅ | 8002 | 天气上下文注入 |
+| demo03 | ✅ | 8003 | QWeather + 高德 POI |
+| demo04 | ✅ | 8004 | LangGraph 工具循环 |
+| demo05 | ⚠️ 旧版暂停 | 8005 | 原问卷分叉，参考用 |
+| demo06 | ✅ | 8006 | 城际交通基础 |
+| demo07 | ✅ | 8007 | 精细交通 + 日志 |
+| demo08 | ✅ | 8008 | Multi-Agent Fan-out/in |
+| demo09 | ✅ | 8009 | 两阶段图 + 城内路线 |
+| demo10 | ✅ | 8010 | 问卷重启 + 画像注入 + AMAP 模块收拢等 |
+| demo11 | ✅ | 8011 | `coord_map` + 高德 JSAPI 地图 + 动画播放 |
 
-### 关键数据流
-```python
-# 1. dispatch 传 payload（不是完整 state）
-Send("weather_agent", {"city": ..., "days": ..., "notes": ...})
-
-# 2. 专家返回 list 字段（operator.add 自动合并）
-return {"context_pieces": ["天气数据..."], "agent_logs": [{...}]}
-
-# 3. planner 读 context_pieces，写 trip_plan（含 locations 列表）
-state["context_pieces"]  # 所有专家数据
-return {"trip_plan": plan.model_dump()}
-
-# 4. route_node 读 trip_plan，改 route_segments，写回
-trip_plan["days"][i]["route_segments"] = [seg.model_dump()]
-return {"trip_plan": trip_plan}  # 覆盖写回
-```
-
-### 关键设计决策记录
-
-1. **问卷系统暂停**：原16题问卷需要重新设计，临时用"兴趣多选"替代
-   - 恢复时间：当问卷设计更合理后（见 demo10 计划）
-   - 代码保留在 demo05/06/07 中，可参考 `app/profiler.py`
-
-2. **transport 预计算而非工具调用**：demo07 开始，交通数据在 LLM 之前计算
-   - 原因：结构化数据（列车班次、价格）LLM 容易"幻想"，工具更可靠
-   - 交通详细卡片直接传给前端，不经过 LLM
-
-3. **LLM 不做路线计算**：route_node 完全不调用 LLM
-   - 原因：路线是精确计算，LLM 不知道实时交通
-   - API 层：高德步行 API（≤2km）+ 公交 API（>2km）+ 距离估算降级
-
-4. **地名清洗**：`route_client._clean_location_name()`
-   - 原因：LLM 生成地名带括号注释（如"楼外楼（西湖醋鱼·老字号）"）导致 geocode 失败
-   - 策略：先用原名，失败后剥离括号再试
+**demo11 关键文件**：`demo11/app/route_client.py`（`get_trip_coords`）、`demo11/app/graph.py`、`demo11/app/schemas.py`、`demo11/app/main.py`（`/api/config`）、`demo11/app/static/index.html`、`demo11/README.md`。
 
 ---
 
-## 六、已知问题与 TODO
+## 四、关键架构与设计决策
 
-### 已知问题
-| 问题 | 位置 | 严重性 | 建议 |
-|------|------|--------|------|
-| LLM 地名含括号导致 geocode 偶发失败 | route_client.py | 🟡 中 | `_clean_location_name` 已修复大部分，可继续优化 |
-| 广州→杭州 火车 DB 无记录 | transport_client.py `_TRAIN_DB` | 🟡 中 | 补充南方城市数据 |
-| 问卷系统 demo05-07 与 demo08-09 代码分叉 | schemas.py | 🟡 中 | demo10 统一 |
-| planner 偶尔生成 `meals: []` 老格式 | graph.py | 🟡 中 | Prompt 已加强，可继续监控 |
-| Windows 终端 GBK 导致日志显示乱码 | logger.py | 🟢 低 | 不影响功能，数据正确 |
-| route_node 对长名景点 geocode 成功率约 70% | route_client.py | 🟡 中 | 需要更智能的名称清洗 |
-
-### 近期 TODO（按优先级）
-- [ ] `_TRAIN_DB` 补充南方城市（广州、深圳、厦门、南京等互相连接）
-- [ ] `_clean_location_name` 增加更多清洗规则（去掉"推荐"、"特色"等形容词）
-- [ ] `route_client` geocode 坐标缓存持久化（Redis 或本地 JSON），避免同一城市重复请求
-- [ ] 前端路线连接器：当 geocode 失败（估算）时显示"(估算)"标注（已有字段，前端已加 rp-est）
+1. **渐进式 demo**：每版可独立运行、自有 `.env` / `requirements.txt`，避免「只有一个大仓库看不懂」。  
+2. **LLM 决策 vs 工具执行**：行程结构由 LLM；**精确路线、列车/驾车等结构化数据由 API/本地库**，减少幻觉。  
+3. **两阶段图（demo09+）**：Phase1 并行采集 → Phase2 `planner_node` → `route_node` 顺序；`route_node` **不调用 LLM**。  
+4. **问卷可选**：画像系统为增强项；未答问卷时仍以兴趣标签为主规划（见 demo10 设计）。  
+5. **交通策略**：城际以驾车/参考列车 + 文案为主；全量 12306 类 API 非本仓库目标。  
+6. **地名与 geocode**：`route_client._clean_location_name` 等缓解括号、别名导致的失败；缓存见 `data/coord_cache.json`（路径相对运行目录）。  
+7. **双 Key（demo11）**：`AMAP_API_KEY` 用于服务端 Web 服务；`AMAP_JS_KEY` 用于前端 JSAPI；类型不同，不可混用。  
+8. **配置暴露**：仅 `/api/config` 返回 `amap_js_key`，不暴露服务端密钥。
 
 ---
 
-## 七、环境配置（快速启动任意 demo）
+## 五、未完成事项与路线图
+
+### 5.1 已知问题（维护优先级参考）
+
+| 问题 | 位置 | 说明 |
+|------|------|------|
+| geocode 偶发失败 / 长名成功率有限 | `route_client.py` | 继续增强清洗与缓存策略 |
+| 南方城市列车 `_TRAIN_DB` 不全 | `transport_client.py` | 按需补数据 |
+| 规划「模板化」、地点固化 | `agents.py` / `graph.py` prompt | 已部分通过 prompt 与检索画像缓解，仍需迭代 |
+| Windows 控制台日志中文乱码 | `logger.py` | 显示问题，数据一般正常 |
+| LangChain + Python 3.14 警告 | 依赖 | 建议 Python 3.11–3.12 用于开发 |
+
+### 5.2 近期工程 TODO（来自维护列表）
+
+- [ ] `_TRAIN_DB` 补充更多城市对  
+- [ ] `_clean_location_name` 扩展规则（如「推荐」「特色」等）  
+- [ ] geocode 缓存：Redis 或统一本地 JSON 策略（已有文件缓存可继续规范）  
+- [ ] 前端对估算路线「（估算）」一致性展示（字段已部分支持）
+
+### 5.3 规划中的后续 demo（见历史路线图）
+
+| 阶段 | 主题 | 要点 |
+|------|------|------|
+| demo12 | 价格系统（轻量） | POI `cost`、预算档位联动等 |
+| demo13 | Supervisor / HITL | 澄清需求、interrupt、checkpoint |
+| demo14 | 生产化 | Docker、限流、Redis 等 |
+
+更长周期：**榜单多源**、**列车实时 API**、**地图逐站配图**、**高并发** 等，需在资源与合规前提下分阶段评估。
+
+---
+
+## 六、相关文件索引（接手阅读顺序）
+
+| 用途 | 路径 |
+|------|------|
+| 仓库级 API 说明 | `AMAP_API_GUIDE.md` |
+| 最新完整功能说明 | `demo11/README.md` |
+| 图编排与状态 | `demo11/app/graph.py` |
+| 专家 Agent | `demo11/app/agents.py` |
+| 城内路线与坐标 | `demo11/app/route_client.py` |
+| 数据模型与 API 响应 | `demo11/app/schemas.py` |
+| 入口与路由 | `demo11/app/main.py` |
+| 问卷与画像 | `demo11/app/questionnaire.py`、`profiler.py` |
+| 高德封装 | `demo11/app/amap/*.py` |
+| 前端 | `demo11/app/static/index.html` |
+| 启动 | `demo11/run.py` |
+
+**接手建议**：在 `demo11` 目录配置 `.env` 后运行 `python run.py`，访问 `http://localhost:8011`；先读 `graph.py` 顶部架构注释，再读 `agents.py`、`route_client.py`。
+
+---
+
+## 七、环境与启动（以 demo11 为例）
 
 ```bash
-# 1. 进入对应 demo 目录
-cd demo09
-
-# 2. 配置 .env（复制示例文件）
+cd demo11
 cp .env.example .env
 # 必填：OPENAI_API_KEY
-# 选填：AMAP_API_KEY（不填则 POI/路线降级）、QWEATHER_API_KEY（不填则用 Open-Meteo）
-
-# 3. 安装依赖（推荐 venv）
+# 推荐：AMAP_API_KEY（服务端 POI/路线/geocode）
+# 地图页面：AMAP_JS_KEY（高德控制台申请「Web端(JS API)」）
 python -m venv .venv
-.venv\Scripts\activate  # Windows
+.venv\Scripts\activate   # Windows
 pip install -r requirements.txt
-
-# 4. 启动
 python run.py
-
-# 5. 访问
-# http://localhost:8009（demo09 端口，其他 demo 对应 8001~8008）
+# 浏览器：http://localhost:8011  （默认 PORT=8011，见 .env.example）
 ```
 
-### .env 最小配置（仅 OpenAI 必填）
+最小 `.env` 示例：
+
 ```env
 OPENAI_API_KEY=sk-xxxxx
 OPENAI_BASE_URL=https://api.openai.com/v1
 OPENAI_MODEL=gpt-4o-mini
 ```
 
-### 完整配置（推荐）
-```env
-OPENAI_API_KEY=sk-xxxxx
-OPENAI_BASE_URL=https://api.openai.com/v1
-OPENAI_MODEL=gpt-4o-mini
-AMAP_API_KEY=xxxxxxxx           # 高德开放平台申请
-QWEATHER_API_KEY=xxxxxxxx       # dev.qweather.com 申请
-QWEATHER_API_HOST=devapi.qweather.com
-QWEATHER_AUTH_TYPE=apikey
-LOG_LEVEL=INFO
-```
+---
+
+## 八、技术栈速览
+
+- **后端**：Python 3.11+、FastAPI、Pydantic v2、LangGraph、LangChain-OpenAI、httpx、uvicorn  
+- **前端**：纯 HTML/CSS/JS，橙 + 天蓝活力主题  
+- **外部能力**：OpenAI 兼容 API、高德（Web 服务 + JS）、和风 / Open-Meteo 天气
+
+### LangGraph 概念覆盖（截至 demo11）
+
+StateGraph、ToolNode、Send Fan-out、Annotated reducer、顺序边、planner/route 读改写、`coord_map` 状态字段。
 
 ---
 
-## 八、后续开发计划与评估
+## 九、与学习者的约定
 
-### demo10 — 问卷系统重启（推荐优先）
-
-**目标**：重设计问卷 → 重接入 planner，真正实现个性化，同时注意问卷系统是用户可选选项，当前仍以用户兴趣选择为主
-
-**改进方向**：
-- 减至 10 题（5 维度），每题必须是真实旅行场景
-- 画像映射改为"直接生成 prompt 片段"（不是分数换标签）
-- 在每日行程中用 `profile_note` 显式说明"因为你选了X，所以推荐Y"
-- 参考：`demo05/app/profiler.py` + `demo05/app/questionnaire.py`
-
-**技术参考**：`demo05/app/profiler.py` 的 `compute_user_profile()` 结构可复用，需重写维度定义。
+本项目既是**可运行演示**，也是**学习模板**。新 demo 建议在文件头保留：与上一版差异、新引入知识点。注释以**架构与原因为主**，避免无信息增量的流水账。
 
 ---
 
-### demo11 — 地图可视化
-
-**目标**：在前端展示高德 JS SDK 地图，行程路线动态播放
-
-**技术方案**：
-```
-复用 route_client._coord_cache 中的坐标数据
-→ 在响应中新增 coord_map: dict[name, "lng,lat"]
-→ 前端加载高德 JS SDK（Web 端 Key，在高德控制台单独申请）
-→ 用 Polyline + 逐步添加 Marker 实现动画
-```
-
-**关键实现**：
-1. `route_node` 结束后，将 `_coord_cache` 中与本次行程相关的坐标打包进响应
-2. 前端在结果页底部渲染地图（高德 JSAPI 2.0）
-3. 用 `setInterval` 逐站展示
-
----
-
-### demo12 — 价格系统（轻量版）
-
-**目标**：为餐厅/景点提供价格参考，与预算档位联动
-
-**实际可行方案**：
-- 高德 POI 响应中 `cost` 字段 = 人均消费，直接用（现在丢弃了，加回来即可）
-- 交通价格已有（demo07 `_TRAIN_DB` + 高德驾车收费）
-- 酒店：用 LLM 按预算档位描述价格区间（不接第三方 OTA）
-- `agents.py` 中 `poi_agent` 改为请求 `extensions=all`（包含 cost 字段）
-
----
-
-### demo13 — Supervisor 模式
-
-**目标**：引入需求澄清对话，用户说"去云南"时自动追问细节
-
-**LangGraph 新知识点**：
-- `Supervisor Agent`（一个 LLM 节点决定下一步）
-- `Human-in-the-loop`（`interrupt_before` / `interrupt_after`）
-- Checkpointing（`MemorySaver`）
-
-**参考代码**：
-```python
-from langgraph.checkpoint.memory import MemorySaver
-graph = builder.compile(checkpointer=MemorySaver(), interrupt_before=["planner_node"])
-```
-
----
-
-### demo14 — 生产化部署
-
-**目标**：Docker 容器化 + 云部署 + 基础安全
-
-**最小实现**：
-```dockerfile
-FROM python:3.11-slim
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-COPY . .
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8009"]
-```
-- `docker-compose.yml`：FastAPI + Redis（geocode 缓存）
-- 腾讯云 CVM 或 Serverless（低成本）
-- 加 `slowapi` 限流（防 LLM 超支）
-
----
-
-## 九、代码质量说明
-
-### 哪些代码可以直接复用
-- `app/logger.py` — 所有 demo 共用，无需修改
-- `app/weather_client.py` — demo03+ 一致，直接复制
-- `app/transport_client.py` — demo07+ 一致，直接复制（需补充南方城市数据）
-- `app/agents.py` — demo08+ 一致，`_parse_notes()` 可继续扩展规则
-
-### 哪些需要小心
-- `TravelState` TypedDict：新增字段必须同时在 `initial_state` 初始化，否则 LangGraph 静默丢弃
-- `planner_node` JSON prompt：字段名必须与 Pydantic schema 完全一致，任何不一致都会导致验证失败
-- `transport_client._TRAIN_DB`：城市名必须用中文（"北京"不是"Beijing"），否则查不到
-
-### 测试方式
-```bash
-# 快速健康检查
-curl http://localhost:8009/api/health
-
-# 完整流程测试（Windows PowerShell）
-$body = '{"city":"杭州","origin":"上海","hotel":"西湖边","travel_days":2,"preferences":["历史文化","美食探索"],"budget_level":"medium","notes":""}' 
-$bytes = [System.Text.Encoding]::UTF8.GetBytes($body)
-$resp = Invoke-WebRequest -Uri "http://localhost:8009/api/trip/plan" -Method POST -ContentType "application/json" -Body $bytes -UseBasicParsing
-($resp.Content | ConvertFrom-Json).success  # 应输出 True
-```
-
----
-
-## 十、与学习者的约定
-
-本项目有双重身份：**可用产品 + 学习模板**。
-
-每个新 demo 文件的头部注释都有：
-- 本 demo 的架构改动说明
-- 与上一版的对比
-- 新引入的 LangGraph/技术知识点
-
-代码中的注释策略：
-- **架构注释**（为什么这么设计）✅ 保留
-- **对比注释**（demo07 vs demo08）✅ 保留
-- **流水账注释**（"这里调用API"）❌ 不写
-
----
-
-*接手后建议先从 demo09 运行起来，阅读 `graph.py` 中的架构注释，再看 `agents.py`，最后看 `route_client.py`。*
+*本文档整合 `HANDOVER.md` 历史版本、项目内实现与对话中达成的目标与迭代共识；后续里程碑完成后请更新「版本」「当前主线」与第三节表格。*
